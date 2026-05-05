@@ -1,4 +1,4 @@
-# 📱 Android Mosques Prayer Notification App
+# 📱 Android Prayer Time & Masjid Notification App
 
 [![Android](https://img.shields.io/badge/Android-11--15-brightgreen?style=flat-square&logo=android)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9-7F52FF?style=flat-square&logo=kotlin)](https://kotlinlang.org)
