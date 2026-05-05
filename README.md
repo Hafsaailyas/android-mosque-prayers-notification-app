@@ -339,5 +339,4 @@ fun scheduleBackgroundSync(context: Context) {
 
 This repository contains **generic architecture patterns and portfolio documentation only**. No production code or proprietary information from the commercial application is included.
 
-*Designed and built to demonstrate production-grade Android notification system expertise.*  
-*Questions? Open an issue or connect on [LinkedIn](#).*
+
