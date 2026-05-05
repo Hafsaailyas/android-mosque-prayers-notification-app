@@ -302,6 +302,16 @@ fun scheduleBackgroundSync(context: Context) {
 
 ---
 
+## 🗺️ Diagrams
+
+| Diagram | Description |
+|---------|-------------|
+| [`diagrams/architecture.mermaid`](diagrams/architecture.mermaid) | Full system component + data flow |
+| [`diagrams/sequence.mermaid`](diagrams/sequence.mermaid) | End-to-end notification delivery sequence |
+| [`diagrams/permission-flow.mermaid`](diagrams/permission-flow.mermaid) | SDK-version permission decision tree |
+| [`diagrams/conflict-resolution.mermaid`](diagrams/conflict-resolution.mermaid) | Dual notification conflict algorithm |
+| [`diagrams/skip-window.mermaid`](diagrams/skip-window.mermaid) | 24-hour timestamp skip window flow |
+
 ## 📂 Detailed Documentation
 
 | Document | Description |
@@ -318,4 +328,7 @@ fun scheduleBackgroundSync(context: Context) {
 
 This repository contains **generic architecture patterns and portfolio documentation only**. No production code or proprietary information from the commercial application is included.
 
+---
 
+*Designed and built to demonstrate production-grade Android notification system expertise.*  
+*Questions? Open an issue or connect on [LinkedIn](#).*
