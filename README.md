@@ -77,6 +77,8 @@ flowchart TD
     style API fill:#2d6a4f,color:#eee
 ```
 
+![Architecture Diagram](diagrams/architecture.png)
+
 ---
 
 ## 📐 Repository Structure
@@ -86,6 +88,13 @@ android-notification-system/
 │
 ├── README.md                               ← You are here
 │
+├── diagrams/
+│   ├── architecture.png                    ← Full system component + data flow
+│   ├── sequence.png                        ← End-to-end notification delivery sequence
+│   ├── permission-flow.png                 ← SDK-version permission decision tree
+│   ├── conflict-resolution.png             ← Dual notification conflict algorithm
+│   └── skip-window.png                     ← 24-hour timestamp skip window flow
+│
 ├── docs/
 │   ├── architecture.md                     ← Component breakdown + mermaid data flow
 │   ├── permission-strategy.md              ← Android version matrix + mermaid onboarding flow
@@ -93,20 +102,12 @@ android-notification-system/
 │   ├── conflict-resolution.md              ← Conflict algorithm + mermaid flowchart
 │   └── skip-window-implementation.md       ← 24-hour window pattern + mermaid sequence
 │
-├── snippets/
-│   ├── workmanager-setup.kt                ← Periodic + immediate + daily reschedule patterns
-│   ├── permission-helper.kt                ← SDK-version conditional checks + PermissionStatus
-│   ├── conflict-detection.kt               ← Set-based conflict algorithm with HH:mm helper
-│   ├── audio-manager.kt                    ← Dual audio stream configuration side-by-side
-│   └── timestamp-skip.kt                   ← TimestampWindowManager class + usage examples
-│
-└── diagrams/
-    ├── architecture.mermaid                ← Full system component + data flow
-    ├── sequence.mermaid                    ← End-to-end notification delivery sequence
-    ├── permission-flow.mermaid             ← SDK-version permission decision tree
-    ├── conflict-resolution.mermaid         ← Dual notification conflict algorithm
-    ├── skip-window.mermaid                 ← 24-hour timestamp skip window flow
-    └── architecture.txt                    ← ASCII fallback diagram
+└── snippets/
+    ├── workmanager-setup.kt                ← Periodic + immediate + daily reschedule patterns
+    ├── permission-helper.kt                ← SDK-version conditional checks + PermissionStatus
+    ├── conflict-detection.kt               ← Set-based conflict algorithm with HH:mm helper
+    ├── audio-manager.kt                    ← Dual audio stream configuration side-by-side
+    └── timestamp-skip.kt                   ← TimestampWindowManager class + usage examples
 ```
 
 ---
@@ -222,7 +223,52 @@ override fun onCreate(savedInstanceState: Bundle?) {
 
 ---
 
-## 📋 Android Version Permission Matrix
+## 📊 End-to-End Sequence
+
+```mermaid
+sequenceDiagram
+    participant API as Remote API
+    participant SW as SyncWorker
+    participant SP as SharedPreferences
+    participant RM as ReminderManager
+    participant SNW as Standard Worker
+    participant FSW as Full-Screen Worker
+
+    API->>SW: HTTP GET /api/prayer-times
+    SW->>SP: save namazi_response + sync_after
+    SW->>RM: processNamaziJson()
+    RM->>SP: read prayer times
+    Note over RM: buildFullScreenConflictSlots() → Set<HH:mm>
+    RM->>SNW: scheduleStandardReminder(playAudio=!conflict)
+    RM->>FSW: scheduleFullScreenReminder(prayerTimeMillis)
+    Note over SNW: doWork() → validate login → show notification
+    Note over FSW: doWork() → validate prayerTimeMillis → launch activity
+```
+
+![Sequence Diagram](diagrams/sequence.png)
+
+---
+
+## 🔐 Permission Flow
+
+```mermaid
+flowchart TD
+    LAUNCH["App Launch"] --> CHECK{"All permissions\ngranted?"}
+    CHECK -->|YES| MAIN["Normal App Flow"]
+    CHECK -->|NO| SKIPCHECK{"Within 24h\nskip window?"}
+    SKIPCHECK -->|YES| MAIN
+    SKIPCHECK -->|NO| SCREEN["Permission Onboarding Screen\nJetpack Compose"]
+    SCREEN --> GRANT["Grant Permission\nopen correct Settings intent"]
+    SCREEN --> SKIP["Skip for Now\nwrite 24h timestamp"]
+    SCREEN --> PERM["Skip Permanently\nset onboarding_skipped flag"]
+    SCREEN --> DONE["All Granted\nmark onboarding complete"]
+    GRANT --> SCREEN
+    SKIP --> MAIN
+    PERM --> MAIN
+    DONE --> MAIN
+```
+
+### Android Version Permission Matrix
 
 | Android | API | Permission Required | Check Method |
 |---------|-----|---------------------|--------------|
@@ -231,6 +277,74 @@ override fun onCreate(savedInstanceState: Bundle?) {
 | 13 | 33 | `SYSTEM_ALERT_WINDOW` + `POST_NOTIFICATIONS` | `Settings.canDrawOverlays()` + runtime |
 | 12 | 32 | `SYSTEM_ALERT_WINDOW` | `Settings.canDrawOverlays()` |
 | 11 | 30 | `SYSTEM_ALERT_WINDOW` | `Settings.canDrawOverlays()` |
+
+![Permission Flow Diagram](diagrams/permission-flow.png)
+
+---
+
+## 🔁 Conflict Resolution
+
+```mermaid
+flowchart TD
+    FS["Full-Screen Alerts List\n[{triggerAt: '13:07:00'}, ...]"]
+    STD["Standard Reminders List\n[{triggerAt: '13:07:00'}, ...]"]
+
+    FS --> FORMAT["Format each triggerAt → HH:mm"]
+    FORMAT --> SLOTS["occupiedSlots = Set { '13:07', '04:25', '19:54' }"]
+
+    STD --> EACH["forEach reminder"]
+    EACH --> TOHHMM["toHourMinute(triggerTimeMillis)"]
+    SLOTS --> CONFLICT{"slotKey in\noccupiedSlots?"}
+    TOHHMM --> CONFLICT
+
+    CONFLICT -->|YES| SILENT["playAudio = false\nNotification shows · audio suppressed"]
+    CONFLICT -->|NO| SOUND["playAudio = true\nNotification shows · audio plays"]
+
+    SLOTS --> ALWAYS["Full-screen alerts\nalways schedule with ALARM audio"]
+
+    style SLOTS fill:#533483,color:#eee
+    style SILENT fill:#2d2d2d,color:#aaa
+    style SOUND fill:#2d6a4f,color:#eee
+    style ALWAYS fill:#6e1a1a,color:#eee
+```
+
+![Conflict Resolution Diagram](diagrams/conflict-resolution.png)
+
+---
+
+## ⏭️ Skip Window
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant A as App (Activity)
+    participant SP as SharedPreferences
+    participant PM as PermissionManager
+
+    U->>A: Taps "Skip for Now"
+    A->>PM: markSkippedForNow()
+    PM->>SP: putLong("skip_for_now_timestamp", now)
+    Note over SP: Timestamp persists across process kills
+
+    Note over A: [Process killed by OS]
+
+    U->>A: Opens app (CLEAR_TASK relaunch)
+    A->>PM: isSkippedForNow()
+    PM->>SP: getLong("skip_for_now_timestamp")
+    SP-->>PM: timestamp value
+    PM-->>A: (now - timestamp) < 86_400_000 → true
+    Note over A: Permission screen SUPPRESSED
+
+    Note over SP: [24 hours later]
+
+    U->>A: Opens app again
+    A->>PM: isSkippedForNow()
+    PM->>SP: getLong("skip_for_now_timestamp")
+    PM-->>A: (now - timestamp) >= 86_400_000 → false
+    Note over A: Permission screen SHOWN AGAIN
+```
+
+![Skip Window Diagram](diagrams/skip-window.png)
 
 ---
 
@@ -315,13 +429,15 @@ fun scheduleBackgroundSync(context: Context) {
 
 ## 🗺️ Diagrams
 
-| Diagram | Description |
-|---------|-------------|
-| [`diagrams/architecture.mermaid`](diagrams/architecture.mermaid) | Full system component + data flow |
-| [`diagrams/sequence.mermaid`](diagrams/sequence.mermaid) | End-to-end notification delivery sequence |
-| [`diagrams/permission-flow.mermaid`](diagrams/permission-flow.mermaid) | SDK-version permission decision tree |
-| [`diagrams/conflict-resolution.mermaid`](diagrams/conflict-resolution.mermaid) | Dual notification conflict algorithm |
-| [`diagrams/skip-window.mermaid`](diagrams/skip-window.mermaid) | 24-hour timestamp skip window flow |
+| Diagram | Mermaid | PNG |
+|---------|---------|-----|
+| Architecture | Embedded above (System Architecture section) | [`diagrams/architecture.png`](diagrams/architecture.png) |
+| Sequence | Embedded above (End-to-End Sequence section) | [`diagrams/sequence.png`](diagrams/sequence.png) |
+| Permission Flow | Embedded above (Permission Flow section) | [`diagrams/permission-flow.png`](diagrams/permission-flow.png) |
+| Conflict Resolution | Embedded above (Conflict Resolution section) | [`diagrams/conflict-resolution.png`](diagrams/conflict-resolution.png) |
+| Skip Window | Embedded above (Skip Window section) | [`diagrams/skip-window.png`](diagrams/skip-window.png) |
+
+---
 
 ## 📂 Detailed Documentation
 
@@ -338,5 +454,3 @@ fun scheduleBackgroundSync(context: Context) {
 ## 📄 License
 
 This repository contains **generic architecture patterns and portfolio documentation only**. No production code or proprietary information from the commercial application is included.
-
-
