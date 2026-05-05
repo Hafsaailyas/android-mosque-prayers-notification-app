@@ -437,8 +437,6 @@ fun scheduleBackgroundSync(context: Context) {
 | Conflict Resolution | Embedded above (Conflict Resolution section) | [`diagrams/conflict-resolution.png`](diagrams/conflict-resolution.png) |
 | Skip Window | Embedded above (Skip Window section) | [`diagrams/skip-window.png`](diagrams/skip-window.png) |
 
----
-
 ## 📂 Detailed Documentation
 
 | Document | Description |
