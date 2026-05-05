@@ -77,7 +77,6 @@ flowchart TD
     style API fill:#2d6a4f,color:#eee
 ```
 
-![Architecture Diagram](diagrams/architecture.png)
 
 ---
 
@@ -88,12 +87,6 @@ android-notification-system/
 │
 ├── README.md                               ← You are here
 │
-├── diagrams/
-│   ├── architecture.png                    ← Full system component + data flow
-│   ├── sequence.png                        ← End-to-end notification delivery sequence
-│   ├── permission-flow.png                 ← SDK-version permission decision tree
-│   ├── conflict-resolution.png             ← Dual notification conflict algorithm
-│   └── skip-window.png                     ← 24-hour timestamp skip window flow
 │
 ├── docs/
 │   ├── architecture.md                     ← Component breakdown + mermaid data flow
@@ -245,7 +238,6 @@ sequenceDiagram
     Note over FSW: doWork() → validate prayerTimeMillis → launch activity
 ```
 
-![Sequence Diagram](diagrams/sequence.png)
 
 ---
 
@@ -278,7 +270,6 @@ flowchart TD
 | 12 | 32 | `SYSTEM_ALERT_WINDOW` | `Settings.canDrawOverlays()` |
 | 11 | 30 | `SYSTEM_ALERT_WINDOW` | `Settings.canDrawOverlays()` |
 
-![Permission Flow Diagram](diagrams/permission-flow.png)
 
 ---
 
@@ -308,7 +299,6 @@ flowchart TD
     style ALWAYS fill:#6e1a1a,color:#eee
 ```
 
-![Conflict Resolution Diagram](diagrams/conflict-resolution.png)
 
 ---
 
@@ -344,7 +334,6 @@ sequenceDiagram
     Note over A: Permission screen SHOWN AGAIN
 ```
 
-![Skip Window Diagram](diagrams/skip-window.png)
 
 ---
 
@@ -426,16 +415,6 @@ fun scheduleBackgroundSync(context: Context) {
 - ✅ Survives device reboots via BroadcastReceiver + WorkManager recovery
 
 ---
-
-## 🗺️ Diagrams
-
-| Diagram | Mermaid | PNG |
-|---------|---------|-----|
-| Architecture | Embedded above (System Architecture section) | [`diagrams/architecture.png`](diagrams/architecture.png) |
-| Sequence | Embedded above (End-to-End Sequence section) | [`diagrams/sequence.png`](diagrams/sequence.png) |
-| Permission Flow | Embedded above (Permission Flow section) | [`diagrams/permission-flow.png`](diagrams/permission-flow.png) |
-| Conflict Resolution | Embedded above (Conflict Resolution section) | [`diagrams/conflict-resolution.png`](diagrams/conflict-resolution.png) |
-| Skip Window | Embedded above (Skip Window section) | [`diagrams/skip-window.png`](diagrams/skip-window.png) |
 
 ## 📂 Detailed Documentation
 
