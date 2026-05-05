@@ -1,4 +1,4 @@
-# 📱 Android Notification System
+# 📱 Android Mosques Prayer Notification App
 
 [![Android](https://img.shields.io/badge/Android-11--15-brightgreen?style=flat-square&logo=android)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9-7F52FF?style=flat-square&logo=kotlin)](https://kotlinlang.org)
@@ -338,8 +338,6 @@ fun scheduleBackgroundSync(context: Context) {
 ## 📄 License
 
 This repository contains **generic architecture patterns and portfolio documentation only**. No production code or proprietary information from the commercial application is included.
-
----
 
 *Designed and built to demonstrate production-grade Android notification system expertise.*  
 *Questions? Open an issue or connect on [LinkedIn](#).*
