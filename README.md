@@ -29,44 +29,52 @@ I was **solely responsible** for designing and implementing the complete native 
 
 ## 🏗️ System Architecture
 
-```
-┌────────────────────────────────────────────────────────────┐
-│                      API Response                          │
-└────────────────────────────┬───────────────────────────────┘
-                             │
-                             ▼
-┌────────────────────────────────────────────────────────────┐
-│              Background Sync Layer (WorkManager)           │
-│  • Periodic polling — interval driven by server response   │
-│  • Boot receiver for device-restart recovery               │
-│  • DailyRescheduleWorker — fresh scheduling each day       │
-└─────────────────────────┬──────────────────────────────────┘
-                          │
-                          ▼
-┌────────────────────────────────────────────────────────────┐
-│             Reminder Orchestration Layer                   │
-│  • Parse and validate server JSON                          │
-│  • Detect time conflicts between notification types        │
-│  • Enqueue OneTimeWork tasks per prayer per reminder       │
-└──────────────┬─────────────────────────────┬───────────────┘
-               │                             │
-               ▼                             ▼
-┌──────────────────────────┐   ┌─────────────────────────────┐
-│   Standard Notifications │   │    Full-Screen Alerts        │
-│  • Configurable timing   │   │  • Wakes device              │
-│  • Audio: NOTIFICATION   │   │  • Over lock screen          │
-│    stream                │   │  • Auto-close timer          │
-│  • Respects silent mode  │   │  • Audio: ALARM stream       │
-│  • Audio disabled when   │   │  • Bypasses silent mode      │
-│    conflict detected     │   │  • Looping until dismissed   │
-└──────────────────────────┘   └─────────────────────────────┘
-               │                             │
-               ▼                             ▼
-┌──────────────────────────┐   ┌─────────────────────────────┐
-│   AudioAlertManager      │   │   FullScreenAudioManager     │
-│   USAGE_NOTIFICATION_    │   │   USAGE_ALARM                │
-│   EVENT                  │   │   (bypasses silent mode)     │
-└──────────────────────────┘   └─────────────────────────────┘
+```mermaid
+flowchart TD
+    API["🌐 Remote API\nPrayer times · reminder configs · sync_after"]
+
+    subgraph SYNC["⚙️ Background Sync Layer"]
+        BOOT["BOOT_COMPLETED\nBroadcastReceiver"]
+        PW["PeriodicWorkRequest\nserver-controlled interval"]
+        SW["SyncWorker\n──────────────────\n1. Validate auth token\n2. HTTP GET w/ Bearer\n3. Process urgent msgs\n4. Cache to SharedPrefs\n5. Save sync_after\n6. Trigger orchestration"]
+        DRW["DailyRescheduleWorker\nRe-schedules every 24h"]
+    end
+
+    subgraph ORCH["🎯 Reminder Orchestration Layer"]
+        PARSE["Parse + validate JSON"]
+        CONFLICT["Build conflict set\nSet of occupied HH:mm slots"]
+    end
+
+    subgraph DELIVER["📬 Notification Delivery"]
+        SNW["Standard Notification Worker\nNotificationCompat · PRIORITY_HIGH\nplayAudio = true / false"]
+        FSW["Full-Screen Alert Worker\nFLAG_SHOW_WHEN_LOCKED\nFLAG_TURN_SCREEN_ON"]
+    end
+
+    subgraph AUDIO["🔊 Audio Layer"]
+        AAM["AudioAlertManager\nUSAGE_NOTIFICATION_EVENT\nRespects silent mode · plays once"]
+        FSAM["FullScreenAudioManager\nUSAGE_ALARM\nBypasses silent mode · loops"]
+    end
+
+    PREFS[("💾 SharedPreferences\nnamazi_response · sync_after\ntoken · skip_window_start")]
+
+    API -->|HTTP GET| SW
+    BOOT --> SW
+    PW --> SW
+    SW --> PARSE
+    SW <-->|read/write| PREFS
+    DRW -->|reads cache| PREFS
+    PARSE --> CONFLICT
+    CONFLICT -->|"playAudio flag"| SNW
+    CONFLICT --> FSW
+    SNW -->|"playAudio = true"| AAM
+    FSW --> FSAM
+
+    style SYNC fill:#1a1a2e,color:#eee
+    style ORCH fill:#16213e,color:#eee
+    style DELIVER fill:#0f3460,color:#eee
+    style AUDIO fill:#533483,color:#eee
+    style PREFS fill:#e9c46a,color:#111
+    style API fill:#2d6a4f,color:#eee
 ```
 
 ---
@@ -76,26 +84,29 @@ I was **solely responsible** for designing and implementing the complete native 
 ```
 android-notification-system/
 │
-├── README.md                          ← You are here
+├── README.md                               ← You are here
 │
 ├── docs/
-│   ├── architecture.md                ← Detailed component breakdown
-│   ├── permission-strategy.md         ← Android version permission matrix
-│   ├── audio-stream-decision.md       ← Why ALARM vs NOTIFICATION stream
-│   ├── conflict-resolution.md         ← Dual notification conflict algorithm
-│   └── skip-window-implementation.md  ← 24-hour timestamp skip window
+│   ├── architecture.md                     ← Component breakdown + mermaid data flow
+│   ├── permission-strategy.md              ← Android version matrix + mermaid onboarding flow
+│   ├── audio-stream-decision.md            ← ALARM vs NOTIFICATION stream rationale
+│   ├── conflict-resolution.md              ← Conflict algorithm + mermaid flowchart
+│   └── skip-window-implementation.md       ← 24-hour window pattern + mermaid sequence
 │
 ├── snippets/
-│   ├── workmanager-setup.kt           ← Periodic sync pattern
-│   ├── permission-helper.kt           ← SDK-version conditional checks
-│   ├── conflict-detection.kt          ← Set-based conflict algorithm
-│   ├── audio-manager.kt               ← Dual audio stream configuration
-│   └── timestamp-skip.kt             ← 24-hour window pattern
+│   ├── workmanager-setup.kt                ← Periodic + immediate + daily reschedule patterns
+│   ├── permission-helper.kt                ← SDK-version conditional checks + PermissionStatus
+│   ├── conflict-detection.kt               ← Set-based conflict algorithm with HH:mm helper
+│   ├── audio-manager.kt                    ← Dual audio stream configuration side-by-side
+│   └── timestamp-skip.kt                   ← TimestampWindowManager class + usage examples
 │
 └── diagrams/
-    ├── architecture.txt               ← Full system ASCII diagram
-    ├── sequence.txt                   ← Notification delivery sequence
-    └── permission-flow.txt            ← Permission onboarding flow
+    ├── architecture.mermaid                ← Full system component + data flow
+    ├── sequence.mermaid                    ← End-to-end notification delivery sequence
+    ├── permission-flow.mermaid             ← SDK-version permission decision tree
+    ├── conflict-resolution.mermaid         ← Dual notification conflict algorithm
+    ├── skip-window.mermaid                 ← 24-hour timestamp skip window flow
+    └── architecture.txt                    ← ASCII fallback diagram
 ```
 
 ---
